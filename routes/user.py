@@ -160,22 +160,26 @@ async def user_stats(request):
     csrf_token = await aiohttp_csrf.generate_token(request)
     async with request.app['mysql'].acquire() as conn:
         async with conn.cursor(DictCursor) as cur:
-            await cur.execute("""
+            print("-----ii--------")
+            print(auth['org'])
+            print("-----ii--------")
+            await cur.execute(f"""
                 SELECT SUM(s.sent_count) AS sent_count, SUM(s.receive_count) AS receive_count
                 FROM categories AS c
                 LEFT JOIN surveys1 AS s
+                # WHERE s.org_id = {auth['org']}
                 ON c.id = s.category
             """)
             rate = await cur.fetchone()
 
-            await cur.execute("""
+            await cur.execute(f"""
                 SELECT c.cat_name, c.cat_slug, SUM(i.answer) AS total, COUNT(i.answer) AS cnt
                 FROM survey_invites1 AS i
                 LEFT JOIN surveys1 AS s
                 ON i.survey_id = s.id
                 LEFT JOIN categories c
                 ON s.category = c.id
-                WHERE NOT ISNULL(i.answer) AND NOT ISNULL(s.id)
+                WHERE NOT ISNULL(i.answer) AND NOT ISNULL(s.id) AND s.org_id = {auth['org']}
                 GROUP BY c.id
             """)
             categories  = await cur.fetchall()
@@ -199,10 +203,10 @@ async def user_stats(request):
                 ON d.id = s.department
                 LEFT JOIN survey_invites1 AS i
                 ON s.id = i.survey_id
-                WHERE d.org = %s
+                WHERE d.org = %s AND s.org_id = %s
                 GROUP BY d.id
                 LIMIT 5
-            """, auth['org'])
+            """, (auth['org'],auth['org']))
             department_rates = await cur.fetchall()
 
             await cur.execute("""
@@ -265,7 +269,7 @@ async def survey_stats(request):
                 ON s.category=c.id
                 LEFT JOIN questions1 AS q
                 ON q.category = c.id
-                WHERE s.id = {survey_id}
+                WHERE s.id = {survey_id} AND s.org_id = {auth['org']}
                 GROUP BY s.id 
             """)
             stats_data = await cur.fetchone()
@@ -275,7 +279,7 @@ async def survey_stats(request):
                 FROM surveys1 AS s
                 LEFT JOIN survey_invites1 i
                 ON s.id = i.survey_id
-                WHERE s.id = {survey_id} AND NOT ISNULL(i.answer)
+                WHERE s.id = {survey_id} AND NOT ISNULL(i.answer) AND s.org_id = {auth['org']}
             """)
             data = await cur.fetchone()
             stats_data['average'] = data['average']
@@ -374,7 +378,7 @@ async def category_stats(request):
                 ON s.category=c.id
                 LEFT JOIN questions1 AS q
                 ON q.category = c.id
-                WHERE c.id = {category_id}
+                WHERE c.id = {category_id} AND s.org_id = {auth['org']}
                 GROUP BY c.id
             """)
             stats_data = await cur.fetchone()
@@ -384,7 +388,7 @@ async def category_stats(request):
                 FROM surveys1 AS s
                 LEFT JOIN survey_invites1 i
                 ON s.id = i.survey_id
-                WHERE s.category = {category_id} AND NOT ISNULL(i.answer)
+                WHERE s.category = {category_id} AND NOT ISNULL(i.answer) AND s.org_id = {auth['org']}
             """)
             data = await cur.fetchone()
             stats_data['average'] = data['average']
@@ -451,8 +455,8 @@ async def survey(request):
                     FROM survey_invites1 AS i
                     LEFT JOIN surveys1 AS s ON i.survey_id = s.id
                     LEFT JOIN questions1 AS q ON i.question_id = q.id
-                    WHERE user_id = %s AND i.id = %s AND NOT ISNULL(s.id)
-                """, (auth.user_id, survey_invite_id))
+                    WHERE user_id = %s AND i.id = %s AND NOT ISNULL(s.id) AND s.org_id = %s
+                """, (auth.user_id, survey_invite_id, auth['org']))
             else:
                 # TODO: set notification seen value
                 await cur.execute("""
@@ -460,8 +464,8 @@ async def survey(request):
                     FROM survey_invites1 AS i
                     LEFT JOIN surveys1 AS s ON i.survey_id = s.id
                     LEFT JOIN questions1 AS q ON i.question_id = q.id
-                    WHERE user_id = %s AND ISNULL(i.answer) AND NOT ISNULL(s.id)
-                """, (auth.user_id))
+                    WHERE user_id = %s AND ISNULL(i.answer) AND NOT ISNULL(s.id) AND s.org_id = %s
+                """, (auth.user_id,auth['org']))
 
             questions = await cur.fetchall()
 
@@ -590,26 +594,29 @@ async def schedule(request):
             await cur.execute("""SELECT * FROM departments""")
             departments = await cur.fetchall()
 
-            await cur.execute("""SELECT * FROM surveys1""")
+            await cur.execute("""SELECT * FROM surveys1 WHERE
+                org_id = %s""", (auth['org']))
             survey1 = await cur.fetchall()
 
-            await cur.execute("SELECT * FROM surveys")
+            await cur.execute("""SELECT * FROM surveys WHERE  
+                org = %s""", (auth['org']))
             surveys = await cur.fetchall()
-            print(survey1)
-            print('-------')
-            print(surveys)
+            # print(survey1)
+            # print('---hello----')
+            # print(surveys)
 
             await cur.execute("""SELECT * FROM users""")
             users = await cur.fetchall()
 
         async with conn.cursor(DictCursor) as cur:
-            await cur.execute("""
+            await cur.execute(f"""
                 SELECT s.id, s.title, s.category, s.department, s.weekly, s.question_order, s.repeat, s.sent_count, s.receive_count, c.cat_name, c.cat_slug, DATE_FORMAT(start_date, '%m/%d/%Y') AS start_date, DATE_FORMAT(end_date, '%m/%d/%Y') AS end_date, TIME_FORMAT(send_at, '%h:%i %p') AS send_at, COUNT(q.id) AS question_count, DATEDIFF(NOW(), s.start_date) AS days_active
                 FROM surveys1 AS s
                 LEFT JOIN categories AS c
                 ON s.category=c.id
                 LEFT JOIN questions1 AS q
                 ON q.category = c.id
+                WHERE s.org_id = {auth['org']}
                 GROUP BY s.id
                 ORDER BY id DESC
             """)
@@ -830,6 +837,7 @@ async def response_rate(request):
 
 @aiohttp_csrf.csrf_exempt
 async def export_csv(request):
+    auth = await init_auth(request, protect=True, permission='user')
     params = request.rel_url.query
     date_range_where = ''
     if params['date_range'] == 'custom':
@@ -861,7 +869,7 @@ async def export_csv(request):
                     FROM survey_invites1 AS i
                     LEFT JOIN surveys1 AS s
                     ON i.survey_id = s.id
-                    WHERE s.category = {params['cat_id']} AND NOT ISNULL(i.answer) AND NOT ISNULL(s.id)
+                    WHERE s.category = {params['cat_id']} AND NOT ISNULL(i.answer) AND NOT ISNULL(s.id) AND s.org_id = {auth['org']}
                     {date_range_where}
                     GROUP BY i.question_id, date_info
                     ORDER BY i.question_id
@@ -872,7 +880,7 @@ async def export_csv(request):
                     FROM survey_invites1 AS i
                     LEFT JOIN surveys1 AS s
                     ON i.survey_id = s.id
-                    WHERE NOT ISNULL(i.answer) AND NOT ISNULL(s.id)
+                    WHERE NOT ISNULL(i.answer) AND NOT ISNULL(s.id) AND {auth['org']}
                     {date_range_where}
                     GROUP BY i.question_id, date_info
                     ORDER BY i.question_id

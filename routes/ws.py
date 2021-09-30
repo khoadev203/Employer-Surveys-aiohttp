@@ -1243,6 +1243,7 @@ async def websocket_handler(request):
                                                         send_at = TIME(%s),
                                                         weekly = %s,
                                                         question_order = %s,
+                                                        org_id = %s,
                                                         `repeat` = %s
                                                     """,
                                                     (
@@ -1254,6 +1255,7 @@ async def websocket_handler(request):
                                                         send_at,
                                                         j.weekly,
                                                         j.order,
+                                                        auth.org,
                                                         j.repeat,
                                                     )
                                                 )
@@ -1911,8 +1913,8 @@ async def websocket_handler(request):
                                 async with request.app['mysql'].acquire() as conn:
                                     async with conn.cursor(DictCursor) as cur:
                                         await cur.execute(f"""
-                                            INSERT INTO surveys1 (title, category, department, start_date, end_date, weekly, send_at, question_order, `repeat`)
-                                            SELECT title, category, department, start_date, end_date, weekly, send_at, question_order, `repeat`
+                                            INSERT INTO surveys1 (title, category, department, start_date, end_date, weekly, send_at, question_order, org_id, `repeat`)
+                                            SELECT title, category, department, start_date, end_date, weekly, send_at, question_order, org_id, `repeat`
                                             FROM surveys1
                                             WHERE id = {j.id}
                                         """)
