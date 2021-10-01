@@ -545,7 +545,7 @@ async def websocket_handler(request):
                                                         WHERE
                                                               sq.org = %s
                                                         ORDER BY sq.survey_id, sq.id
-                                                        """, (auth['org'],))
+                                                        """, (auth.org,))
                                                     questions = await cur.fetchall()
                                                     questions = to_data(questions) if questions is not None and len(
                                                         questions) > 0 else []
@@ -678,7 +678,7 @@ async def websocket_handler(request):
                                                         org = %s
                                                         AND
                                                         (dept1 = %s or dept2 = %s or dept3 = %s)
-                                                        """, (_auth['org'], _auth['dept'], _auth['dept'],
+                                                        """, (_auth.org, _auth['dept'], _auth['dept'],
                                                               _auth['dept'],))
                                                     questions = await cur.fetchall()
                                                     await cur.execute(
@@ -1215,7 +1215,8 @@ async def websocket_handler(request):
                                                             send_at = TIME(%s),
                                                             weekly = %s,
                                                             question_order = %s,
-                                                            `repeat` = %s
+                                                            `repeat` = %s,
+                                                            org_id = %s
                                                         WHERE id = %s
                                                         """, (
                                                             j.title,
@@ -1227,6 +1228,7 @@ async def websocket_handler(request):
                                                             j.weekly,
                                                             j.order,
                                                             j.repeat,
+                                                            auth.org,
                                                             j.id
                                                         )
                                                     )
@@ -1265,7 +1267,7 @@ async def websocket_handler(request):
                                                         f"Saved survey cron #{cur.lastrowid}")
                                                     if j.id:
                                                         await cur.execute(f"""
-                                                            SELECT s.id, s.title, s.category, s.department, s.weekly, s.question_order, s.repeat, s.sent_count, s.receive_count, c.cat_name, c.cat_slug, DATE_FORMAT(start_date, '%m/%d/%Y') AS start_date, DATE_FORMAT(end_date, '%m/%d/%Y') AS end_date, TIME_FORMAT(send_at, '%h:%i %p') AS send_at, COUNT(q.id) AS question_count, DATEDIFF(NOW(), s.start_date) AS days_active
+                                                            SELECT s.id, s.title, s.category, s.department, s.weekly, s.question_order, s.repeat, s.sent_count, s.receive_count, c.cat_name, c.cat_slug, DATE_FORMAT(start_date, '%m/%d/%Y') AS start_date, DATE_FORMAT(end_date, '%m/%d/%Y') AS end_date, TIME_FORMAT(send_at, '%h:%i %p') AS send_at, COUNT(q.id) AS question_count, DATEDIFF(NOW(), s.start_date) AS days_active, s.org_id
                                                             FROM surveys1 AS s
                                                             LEFT JOIN categories AS c
                                                             ON s.category=c.id
@@ -1274,7 +1276,7 @@ async def websocket_handler(request):
                                                             WHERE s.id = {j.id}""")
                                                     else:
                                                         await cur.execute(f"""
-                                                            SELECT s.id, s.title, s.category, s.department, s.weekly, s.question_order, s.repeat, s.sent_count, s.receive_count, c.cat_name, c.cat_slug, DATE_FORMAT(start_date, '%m/%d/%Y') AS start_date, DATE_FORMAT(end_date, '%m/%d/%Y') AS end_date, TIME_FORMAT(send_at, '%h:%i %p') AS send_at, COUNT(q.id) AS question_count, DATEDIFF(NOW(), s.start_date) AS days_active
+                                                            SELECT s.id, s.title, s.category, s.department, s.weekly, s.question_order, s.repeat, s.sent_count, s.receive_count, c.cat_name, c.cat_slug, DATE_FORMAT(start_date, '%m/%d/%Y') AS start_date, DATE_FORMAT(end_date, '%m/%d/%Y') AS end_date, TIME_FORMAT(send_at, '%h:%i %p') AS send_at, COUNT(q.id) AS question_count, DATEDIFF(NOW(), s.start_date) AS days_active, s.org_id
                                                             FROM surveys1 AS s
                                                             LEFT JOIN categories AS c
                                                             ON s.category=c.id
@@ -1530,7 +1532,7 @@ async def websocket_handler(request):
                                                             """
                                                 sql_values = (_auth['user_id'],
                                                               1 if this_dept.slug == "management" else 0,
-                                                              _auth['org'],
+                                                              _auth.org,
                                                               this_dept.slug,
                                                               _auth['company_name'],)
                                                 crypt_context = CryptContext(
@@ -1744,10 +1746,11 @@ async def websocket_handler(request):
                             if case('survey_list'):
                                 async with request.app['mysql'].acquire() as conn:
                                     async with conn.cursor(DictCursor) as cur:
-                                        await cur.execute("""SELECT s.*, c.cat_name, c.cat_slug
+                                        await cur.execute(f"""SELECT s.*, c.cat_name, c.cat_slug
                                             FROM surveys1 AS s
                                             LEFT JOIN categories AS c
-                                            ON s.category=c.id""")
+                                            ON s.category=c.id
+                                            WHERE s.org_id={auth.org}""")
                                         surveys = await cur.fetchall()
                                         await wsr.reply({
                                             'surveys': surveys
@@ -1844,7 +1847,7 @@ async def websocket_handler(request):
                                                 ON i.survey_id = s.id
                                                 LEFT JOIN categories AS c
                                                 ON s.category = c.id
-                                                WHERE NOT ISNULL(i.answer) AND NOT ISNULL(s.id) AND s.category = {i}
+                                                WHERE NOT ISNULL(i.answer) AND NOT ISNULL(s.id) AND s.category = {i} AND s.org_id = {auth.org}
                                                 GROUP BY c.id, date_info
                                                 ORDER BY date_info DESC
                                             """)
@@ -1921,7 +1924,7 @@ async def websocket_handler(request):
                                         await conn.commit()
                                     
                                         await cur.execute(f"""
-                                            SELECT s.id, s.title, s.category, s.department, s.weekly, s.question_order, s.repeat, s.sent_count, s.receive_count, c.cat_name, c.cat_slug, DATE_FORMAT(start_date, '%m/%d/%Y') AS start_date, DATE_FORMAT(end_date, '%m/%d/%Y') AS end_date, TIME_FORMAT(send_at, '%h:%i %p') AS send_at, COUNT(q.id) AS question_count, DATEDIFF(NOW(), s.start_date) AS days_active
+                                            SELECT s.id, s.title, s.category, s.department, s.weekly, s.question_order, s.repeat, s.sent_count, s.receive_count, c.cat_name, c.cat_slug, DATE_FORMAT(start_date, '%m/%d/%Y') AS start_date, DATE_FORMAT(end_date, '%m/%d/%Y') AS end_date, TIME_FORMAT(send_at, '%h:%i %p') AS send_at, COUNT(q.id) AS question_count, DATEDIFF(NOW(), s.start_date) AS days_active, s.org_id
                                             FROM surveys1 AS s
                                             LEFT JOIN categories AS c
                                             ON s.category=c.id
