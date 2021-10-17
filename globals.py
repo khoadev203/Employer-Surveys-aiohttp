@@ -73,3 +73,37 @@ for env_key, type_setter in env_params.items():
     except KeyError:
         log.warning("Env var 'key' error, unable to set:", env_key)
         continue
+if len(ENV) == 0:
+    ENV = {
+        'SITE_USE_MULTITHREAD': False,
+        'SITE_HOST': "0.0.0.0",
+        'PORT': 8080,
+        'SITE_NAME': "Employer Surveys",
+        'SITE_DEBUG_TOOLBAR': False,
+        'SITE_UVLOOP': False,
+        'SITE_GEO_PATH': "data/GeoLite2-City.mmdb",
+        'SITE_COOKIE_NAME': "esurvey",
+        'SITE_LOG_LEVEL': "DEBUG",
+        'EMAIL_SENDGRID_KEY': "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",
+        'EMAIL_DEFAULT_SENDER': "site@em4055.survey.surf",
+        'SMS_TWILIO_ACCOUNT_SID': "EV[1:Q+QL+0t82xUN55VnOJTZQhYmnKOjvYV2:VazQum/ZFqQxpcoEbVic4ZepGsxliKuw2Y48tKGkG7wCwLw0muz/6uVtGrCXTLJGiaM=]",
+        'SMS_TWILIO_AUTH_TOKEN': "EV[1:7m9BvPag99El1BB4hUbkHbT5HIJwOeld:ongCcl8av2mSQOA+BSb/82cw0dzubxPbcRalieMwTpTQPuweXe1YAr+vDsmRyKUM]",
+        'SMS_TWILIO_NUMBER': "+19549325677",
+        # 'MYSQL_HOSTNAME': "db-mysql-nyc3-01654-do-user-9432786-0.b.db.ondigitalocean.com",
+        # 'MYSQL_PORT': 25060,
+        # 'MYSQL_DATABASE': "defaultdb",
+        # 'MYSQL_USERNAME': "doadmin",
+        # 'MYSQL_PASSWORD': "rt25hd8spmof4v7h",
+        'MYSQL_HOSTNAME': "127.0.0.1",
+        'MYSQL_PORT': 3306,
+        'MYSQL_DATABASE': "survey",
+        'MYSQL_USERNAME': "newuser",
+        'MYSQL_PASSWORD': "password",
+        'REDIS_URL': "rediss://default:cjee6j7redseg6d8@db-redis-nyc3-89317-do-user-9432786-0.b.db.ondigitalocean.com:25061",
+        'CSRF_FORM_FIELD': "csrf",
+        'CSRF_SESSION_NAME': "csrf",
+        'CSRF_SECRET': "EV[1:1vI7pRjcdF2rZ0afzEFw/qiCtQEY1aL4:oeglt1Elfi2oaSzTxhYR7ZjlJz36nW/Tqm1w4Meaj8BGS/A2r7qaUriLYu0Sdg==]",
+        'JWT_SECRET': "EV[1:VVXFtTndSK0hRs47i920km+Onky9cp5Q:0K/kl0SL51Knl6IaJp8yF1S3RTW2mJO7s/cm8buSYPX1vF3ROQNZl0A687DMDQ==]",
+        'SITE_DOMAIN': "gohyer",
+        'IN_PRODUCTION': False,
+    }
